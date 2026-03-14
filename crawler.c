@@ -92,7 +92,7 @@ void compute_hash(const char* path, uint8_t* output)
         }
 
         if (total_read != 64) {
-            fprintf(stderr, "Error: Expected to read 64 characters for hash, but got %zu.\n", total_read);
+            // fprintf(stderr, "Error: Expected to read 64 characters for hash, but got %zu.\n", total_read);
             exit(1);
         }
 
@@ -108,7 +108,7 @@ void compute_hash(const char* path, uint8_t* output)
         }
 
         if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-            fprintf(stderr, "Error: sha256sum command failed.\n");
+            // fprintf(stderr, "Error: sha256sum command failed.\n");
             exit(1);
         }
 
@@ -116,7 +116,7 @@ void compute_hash(const char* path, uint8_t* output)
         // Convert hex string to bytes
         for (int i = 0; i < 32; i++) {
             if (sscanf(&hash_str[i * 2], "%2hhx", &output[i]) != 1) {
-                fprintf(stderr, "Error: Failed to parse hash output.\n");
+                // fprintf(stderr, "Error: Failed to parse hash output.\n");
                 exit(1);
             }
         }

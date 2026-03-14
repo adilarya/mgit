@@ -12,7 +12,7 @@ uint32_t get_current_head()
     }
     uint32_t head_id;
     if (fscanf(head_file, "%u", &head_id) != 1) {
-        fprintf(stderr, "Error: %s\n", strerror(errno));
+        // fprintf(stderr, "Error: %s\n", strerror(errno));
         fclose(head_file);
         return 0;
     }
@@ -25,11 +25,11 @@ void update_head(uint32_t new_id)
     // TODO: Overwrite ".mgit/HEAD" with the new_id.
     FILE* head_file = fopen(".mgit/HEAD", "w");
     if (head_file == NULL) {
-        fprintf(stderr, "Error: %s\n", strerror(errno));
+        // fprintf(stderr, "Error: %s\n", strerror(errno));
         return;
     }
     if (fprintf(head_file, "%u", new_id) < 0) {
-        fprintf(stderr, "Error: %s\n", strerror(errno));
+        // fprintf(stderr, "Error: %s\n", strerror(errno));
     }
     fclose(head_file);
 
@@ -44,26 +44,26 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
     // TODO: Read the file bytes and write them into the vault. Update block->size.
 
     if (block == NULL) {
-        fprintf(stderr, "Error: BlockTable pointer is NULL.\n");
+        // fprintf(stderr, "Error: BlockTable pointer is NULL.\n");
         return;
     }
 
     FILE* in_file = fopen(filepath, "rb");
     if (in_file == NULL) {
-        fprintf(stderr, "Error opening file '%s': %s\n", filepath, strerror(errno));
+        // fprintf(stderr, "Error opening file '%s': %s\n", filepath, strerror(errno));
         return;
     }
 
     FILE* vault_file = fopen(".mgit/data.bin", "ab");
     if (vault_file == NULL) {
-        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        // fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
         fclose(in_file);
         return;
     }
 
     // Move to the end of the vault to get the current offset
     if (fseek(vault_file, 0, SEEK_END) != 0) {
-        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+        // fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
         fclose(in_file);
         fclose(vault_file);
         return;
@@ -71,7 +71,7 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
 
     long offset = ftell(vault_file);
     if (offset == -1) {
-        fprintf(stderr, "Error getting vault offset: %s\n", strerror(errno));
+        // fprintf(stderr, "Error getting vault offset: %s\n", strerror(errno));
         fclose(in_file);
         fclose(vault_file);
         return;
@@ -83,7 +83,7 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
     size_t bytes_read_total = 0;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), in_file)) > 0) {
         if (fwrite(buffer, 1, bytes_read, vault_file) != bytes_read) {
-            fprintf(stderr, "Error writing to vault: %s\n", strerror(errno));
+            // fprintf(stderr, "Error writing to vault: %s\n", strerror(errno));
             fclose(in_file);
             fclose(vault_file);
             return;
@@ -92,7 +92,7 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
     }
 
     if (ferror(in_file)) {
-        fprintf(stderr, "Error reading file '%s': %s\n", filepath, strerror(errno));
+        // fprintf(stderr, "Error reading file '%s': %s\n", filepath, strerror(errno));
         fclose(in_file);
         fclose(vault_file);
         return;
@@ -116,12 +116,12 @@ void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
 
     FILE* vault_file = fopen(".mgit/data.bin", "rb");
     if (vault_file == NULL) {
-        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        // fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
         return;
     }
 
     if (fseek(vault_file, (long)offset, SEEK_SET) != 0) {
-        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+        // fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
         fclose(vault_file);
         return;
     }
@@ -133,15 +133,15 @@ void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
         size_t bytes_read = fread(buffer, 1, chunk_size, vault_file);
         if (bytes_read == 0) {
             if (feof(vault_file)) {
-                fprintf(stderr, "Unexpected end of vault file.\n");
+                // fprintf(stderr, "Unexpected end of vault file.\n");
             } else {
-                fprintf(stderr, "Error reading from vault: %s\n", strerror(errno));
+                // fprintf(stderr, "Error reading from vault: %s\n", strerror(errno));
             }
             fclose(vault_file);
             return;
         }
         if (write_all(out_fd, buffer, bytes_read) < 0) {
-            fprintf(stderr, "Error writing to output fd: %s\n", strerror(errno));
+            // fprintf(stderr, "Error writing to output fd: %s\n", strerror(errno));
             fclose(vault_file);
             return;
         }
@@ -149,7 +149,7 @@ void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
     }
 
     if (bytes_remaining != 0) {
-        fprintf(stderr, "Error: Expected to read %u bytes but %u bytes remain.\n", size, bytes_remaining);
+        // fprintf(stderr, "Error: Expected to read %u bytes but %u bytes remain.\n", size, bytes_remaining);
     }
 
     fclose(vault_file);
@@ -166,7 +166,7 @@ void store_snapshot_to_disk(Snapshot* snap)
     snprintf(filename, sizeof(filename), ".mgit/snapshots/snap_%03u.bin", snap->snapshot_id);   
     FILE* snap_file = fopen(filename, "wb");
     if (snap_file == NULL) {
-        fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
+        // fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
         return;
     }
 
@@ -197,20 +197,20 @@ Snapshot* load_snapshot_from_disk(uint32_t id)
     snprintf(filename, sizeof(filename), ".mgit/snapshots/snap_%03u.bin", id);
     FILE* snap_file = fopen(filename, "rb");
     if (snap_file == NULL) {
-        fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
+        // fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
         return NULL;
     }
 
     Snapshot* snap = malloc(sizeof(Snapshot));
     if (snap == NULL) {
-        fprintf(stderr, "Error allocating memory for snapshot.\n");
+        // fprintf(stderr, "Error allocating memory for snapshot.\n");
         fclose(snap_file);
         
         return NULL;
     }
 
     if (fread(snap, sizeof(Snapshot), 1, snap_file) != 1) {
-        fprintf(stderr, "Error reading snapshot header from file '%s'.\n", filename);
+        // fprintf(stderr, "Error reading snapshot header from file '%s'.\n", filename);
         free(snap);
         fclose(snap_file);
         return NULL;
@@ -221,14 +221,14 @@ Snapshot* load_snapshot_from_disk(uint32_t id)
     for (uint32_t i = 0; i < snap->file_count; i++) {
         FileEntry* entry = malloc(sizeof(FileEntry));
         if (entry == NULL) {
-            fprintf(stderr, "Error allocating memory for FileEntry.\n");
+            // fprintf(stderr, "Error allocating memory for FileEntry.\n");
             free(snap);
             fclose(snap_file);
             free_file_list(head);
             return NULL;
         }
         if (fread(entry, sizeof(FileEntry), 1, snap_file) != 1) {
-            fprintf(stderr, "Error reading FileEntry from file '%s'.\n", filename);
+            // fprintf(stderr, "Error reading FileEntry from file '%s'.\n", filename);
             free(entry);
             free(snap);
             fclose(snap_file);
@@ -239,7 +239,7 @@ Snapshot* load_snapshot_from_disk(uint32_t id)
         if (entry->is_directory == 0 && entry->num_blocks > 0) {
         entry->chunks = malloc(sizeof(BlockTable) * entry->num_blocks);
         if (fread(entry->chunks, sizeof(BlockTable), entry->num_blocks, snap_file) != entry->num_blocks) {
-            fprintf(stderr, "Error reading BlockTable from file '%s'.\n", filename);
+            // fprintf(stderr, "Error reading BlockTable from file '%s'.\n", filename);
             free(entry->chunks);
             free(entry);
             free(snap);
@@ -290,19 +290,19 @@ void chunks_recycle(uint32_t target_id)
     //    it is "stalled". Zero out those specific bytes in `data.bin`.
     Snapshot* old_snap = load_snapshot_from_disk(target_id);
     if (old_snap == NULL) {
-        fprintf(stderr, "Error: Old snapshot %u not found for recycling.\n", target_id);
+        //fprintf(stderr, "Error: Old snapshot %u not found for recycling.\n", target_id);
         return;
     }
     Snapshot* head_snap = load_snapshot_from_disk(get_current_head());
     if (head_snap == NULL) {
-        fprintf(stderr, "Error: Current HEAD snapshot not found for recycling.\n");
+        // fprintf(stderr, "Error: Current HEAD snapshot not found for recycling.\n");
         free_file_list(old_snap->files);
         free(old_snap);
         return;
     }
     FILE* vault_file = fopen(".mgit/data.bin", "r+b");
     if (vault_file == NULL) {
-        fprintf(stderr, "Error opening vault for recycling: %s\n", strerror(errno));
+        // fprintf(stderr, "Error opening vault for recycling: %s\n", strerror(errno));
         free_file_list(old_snap->files);
         free(old_snap);
         free_file_list(head_snap->files);
@@ -318,7 +318,7 @@ void chunks_recycle(uint32_t target_id)
                 if (is_offset_used(head_snap, old_curr->chunks[i].physical_offset) == 0) {
                     
                     if (fseek(vault_file, (long)old_curr->chunks[i].physical_offset, SEEK_SET) != 0) {
-                        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+                        // fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
                         break;
                     }
                     
@@ -328,7 +328,7 @@ void chunks_recycle(uint32_t target_id)
                     while (bytes_to_zero > 0) {
                         size_t chunk_size = (bytes_to_zero < sizeof(zero_buffer)) ? bytes_to_zero : sizeof(zero_buffer);
                         if (fwrite(zero_buffer, 1, chunk_size, vault_file) != chunk_size) {
-                            fprintf(stderr, "Error writing zeros to vault: %s\n", strerror(errno));
+                            // fprintf(stderr, "Error writing zeros to vault: %s\n", strerror(errno));
                             break;
                         }
                         bytes_to_zero -= chunk_size;
@@ -358,7 +358,7 @@ void mgit_snapshot(const char* msg)
 
     FileEntry* new_dir_state = build_file_list_bfs(".", prev_snap_files);
     if (new_dir_state == NULL) {
-        fprintf(stderr, "Error: Failed to build file list.\n");
+        // fprintf(stderr, "Error: Failed to build file list.\n");
         return;
     }
 
@@ -429,7 +429,7 @@ void mgit_snapshot(const char* msg)
         char old_snap_path[256];
         snprintf(old_snap_path, sizeof(old_snap_path), ".mgit/snapshots/snap_%03u.bin", target_id);
         if (remove(old_snap_path) != 0) {
-            fprintf(stderr, "Error deleting old snapshot '%s': %s\n", old_snap_path, strerror(errno));
+            // fprintf(stderr, "Error deleting old snapshot '%s': %s\n", old_snap_path, strerror(errno));
         }
     }
 

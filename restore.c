@@ -43,10 +43,9 @@ void mgit_restore(const char* id_str)
         return;
     uint32_t id = atoi(id_str);
 
-    // 1. Load Target Snapshot
     Snapshot* target_snap = load_snapshot_from_disk(id);
     if (!target_snap) {
-        fprintf(stderr, "Error: Snapshot %d not found.\n", id);
+        // fprintf(stderr, "Error: Snapshot %d not found.\n", id);
         exit(1);
     }
 
@@ -64,11 +63,11 @@ void mgit_restore(const char* id_str)
         if (strcmp(curr->path, ".") != 0 && path_in_snapshot(target_snap, curr->path) == 0) {
             if (curr->is_directory == 1) {
                 if (rmdir(curr->path) == -1) {
-                    fprintf(stderr, "Error removing directory '%s': %s\n", curr->path, strerror(errno));
+                    // fprintf(stderr, "Error removing directory '%s': %s\n", curr->path, strerror(errno));
                 }
             } else {
                 if (unlink(curr->path) == -1) {
-                    fprintf(stderr, "Error removing file '%s': %s\n", curr->path, strerror(errno));
+                    // fprintf(stderr, "Error removing file '%s': %s\n", curr->path, strerror(errno));
                 }
             }
         }
@@ -91,7 +90,7 @@ void mgit_restore(const char* id_str)
             if (target_curr->is_directory == 1) {
                 if (mkdir(target_curr->path, 0755) == -1) {
                     if (errno != EEXIST) { 
-                            fprintf(stderr, "Error creating directory '%s': %s\n", target_curr->path, strerror(errno));
+                            // fprintf(stderr, "Error creating directory '%s': %s\n", target_curr->path, strerror(errno));
                     }                
                 }
             } else {
@@ -106,7 +105,7 @@ void mgit_restore(const char* id_str)
                 }
                 FILE* out_file = fopen(target_curr->path, "wb");
                 if (out_file == NULL) {
-                    fprintf(stderr, "Error creating file '%s': %s\n", target_curr->path, strerror(errno));
+                    // fprintf(stderr, "Error creating file '%s': %s\n", target_curr->path, strerror(errno));
                     target_curr = target_curr->next;
                     continue;
                 }
@@ -127,9 +126,9 @@ void mgit_restore(const char* id_str)
                 uint8_t computed_checksum[32];
                 compute_hash(target_curr->path, computed_checksum);
                 if (memcmp(computed_checksum, target_curr->checksum, 32) != 0) {
-                    fprintf(stderr, "Error: Checksum mismatch for file '%s'. File may be corrupted.\n", target_curr->path);
+                    // fprintf(stderr, "Error: Checksum mismatch for file '%s'. File may be corrupted.\n", target_curr->path);
                     if (unlink(target_curr->path) == -1) {
-                        fprintf(stderr, "Error removing corrupted file '%s': %s\n", target_curr->path, strerror(errno));
+                        // fprintf(stderr, "Error removing corrupted file '%s': %s\n", target_curr->path, strerror(errno));
                     }
                     exit(1);
                 }
