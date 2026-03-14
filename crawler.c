@@ -22,6 +22,109 @@ void compute_hash(const char* path, uint8_t* output)
     //       2. Read exactly 64 characters (the hex string) from the read end.
     //       3. Convert the hex string into 32 bytes and store it in 'output'.
     //       4. Remember to wait() for the child to finish!
+
+    int pipefd[2];
+    
+    if (pipe(pipefd) == -1) {
+        perror("pipe failed");
+        exit(1);
+    }
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child process
+        if (close(pipefd[0]) == -1) { // Close read end
+            perror("Failed to close read end of pipe");
+            exit(1);
+        }
+        
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2 failed");
+            exit(1);
+        }
+
+        if (close(pipefd[1]) == -1) { // Close original write end
+            perror("Failed to close write end of pipe");
+            exit(1);
+        }
+
+        int dev_null = open("/dev/null", O_WRONLY);
+
+        if (dev_null == -1) {
+            perror("Failed to open /dev/null");
+            exit(1);
+        }
+
+        if (dup2(dev_null, STDERR_FILENO) == -1) {
+            perror("dup2 failed");
+            exit(1);
+        }
+
+        if (close(dev_null) == -1) {
+            perror("Failed to close /dev/null");
+            exit(1);
+        }
+        
+        if (execlp("sha256sum", "sha256sum", path, (char*)NULL) == -1) {
+            exit(1);
+        }
+    } else if (pid > 0) {
+        // Parent process
+
+        if (close(pipefd[1]) == -1) { // Close write end
+            perror("Failed to close write end of pipe");
+            exit(1);
+        }
+
+        char hash_str[65]; // 64 chars + null terminator; not reading all at once can lead to issues, scanning in a loop is safer
+        ssize_t bytes_read = 0;
+        size_t total_read = 0;
+        while (total_read < 64) {
+            bytes_read = read(pipefd[0], hash_str + total_read, 64 - total_read);
+            if (bytes_read == -1) {
+                perror("Failed to read from pipe");
+                exit(1);
+            } else if (bytes_read == 0) {
+                break; // EOF
+            }
+            total_read += bytes_read;
+        }
+
+        if (total_read != 64) {
+            fprintf(stderr, "Error: Expected to read 64 characters for hash, but got %zu.\n", total_read);
+            exit(1);
+        }
+
+        if (close(pipefd[0]) == -1) { // Close read end
+            perror("Failed to close read end of pipe");
+            exit(1);
+        }
+
+        int status;
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid failed");
+            exit(1);
+        }
+
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            fprintf(stderr, "Error: sha256sum command failed.\n");
+            exit(1);
+        }
+
+        hash_str[64] = '\0'; // Null-terminate the string
+        // Convert hex string to bytes
+        for (int i = 0; i < 32; i++) {
+            if (sscanf(&hash_str[i * 2], "%2hhx", &output[i]) != 1) {
+                fprintf(stderr, "Error: Failed to parse hash output.\n");
+                exit(1);
+            }
+        }
+    } else {
+        // Fork failed
+        perror("fork failed");
+        exit(1);
+    }
+
 }
 
 // Check if file matches previous snapshot (Quick Check)
