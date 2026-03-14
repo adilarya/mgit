@@ -12,7 +12,7 @@ uint32_t get_current_head()
     }
     uint32_t head_id;
     if (fscanf(head_file, "%u", &head_id) != 1) {
-        fprintf(stderr, "Error: Could not read from .mgit/HEAD: %s\n", strerror(errno));
+        fprintf(stderr, "Error: %s\n", strerror(errno));
         fclose(head_file);
         return 0;
     }
@@ -25,11 +25,11 @@ void update_head(uint32_t new_id)
     // TODO: Overwrite ".mgit/HEAD" with the new_id.
     FILE* head_file = fopen(".mgit/HEAD", "w");
     if (head_file == NULL) {
-        fprintf(stderr, "Error: Could not open .mgit/HEAD for writing: %s\n", strerror(errno));
+        fprintf(stderr, "Error: %s\n", strerror(errno));
         return;
     }
     if (fprintf(head_file, "%u", new_id) < 0) {
-        fprintf(stderr, "Error: Could not write to .mgit/HEAD: %s\n", strerror(errno));
+        fprintf(stderr, "Error: %s\n", strerror(errno));
     }
     fclose(head_file);
 
