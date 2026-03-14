@@ -73,4 +73,13 @@ void free_file_list(FileEntry* head)
 {
     // TODO: Iterate through the linked list and free() each node,
     // including the dynamically allocated 'chunks' array within each node.
+    FileEntry* curr = head;
+    while (curr) {
+        FileEntry* next = curr->next;
+        if (curr->chunks != NULL) {
+            free(curr->chunks);
+        }
+        free(curr);
+        curr = next;
+    }
 }
