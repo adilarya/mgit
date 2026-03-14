@@ -45,7 +45,7 @@ void mgit_restore(const char* id_str)
 
     Snapshot* target_snap = load_snapshot_from_disk(id);
     if (!target_snap) {
-        // fprintf(stderr, "Error: Snapshot %d not found.\n", id);
+        fprintf(stderr, "Error: Snapshot %d not found.\n", id);
         exit(1);
     }
 
@@ -126,9 +126,9 @@ void mgit_restore(const char* id_str)
                 uint8_t computed_checksum[32];
                 compute_hash(target_curr->path, computed_checksum);
                 if (memcmp(computed_checksum, target_curr->checksum, 32) != 0) {
-                    // fprintf(stderr, "Error: Checksum mismatch for file '%s'. File may be corrupted.\n", target_curr->path);
+                    fprintf(stderr, "Error: Checksum mismatch for file '%s'. File may be corrupted.\n", target_curr->path);
                     if (unlink(target_curr->path) == -1) {
-                        // fprintf(stderr, "Error removing corrupted file '%s': %s\n", target_curr->path, strerror(errno));
+                        fprintf(stderr, "Error removing corrupted file '%s': %s\n", target_curr->path, strerror(errno));
                     }
                     exit(1);
                 }
