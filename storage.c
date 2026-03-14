@@ -264,6 +264,23 @@ Snapshot* load_snapshot_from_disk(uint32_t id)
     return snap;
 }
 
+int is_offset_used(Snapshot* snap, uint64_t target_offset) {
+    if (snap == NULL || snap->files == NULL) {
+        return 0; 
+    }
+    FileEntry* curr = snap->files;
+    while (curr != NULL) {       
+        if (curr->is_directory == 0 && curr->num_blocks > 0 && curr->chunks != NULL) {          
+            for (uint32_t i = 0; i < curr->num_blocks; i++) {
+                if (curr->chunks[i].physical_offset == target_offset) {
+                    return 1; 
+                }
+            }
+        }
+        curr = curr->next;
+    }
+    return 0;
+}
 void chunks_recycle(uint32_t target_id)
 {
     // TODO: Garbage Collection (The Vacuum)
@@ -271,6 +288,61 @@ void chunks_recycle(uint32_t target_id)
     // 2. Iterate through the oldest snapshot's files.
     // 3. If a chunk's physical_offset is NOT being used by ANY file in the HEAD snapshot,
     //    it is "stalled". Zero out those specific bytes in `data.bin`.
+    Snapshot* old_snap = load_snapshot_from_disk(target_id);
+    if (old_snap == NULL) {
+        fprintf(stderr, "Error: Old snapshot %u not found for recycling.\n", target_id);
+        return;
+    }
+    Snapshot* head_snap = load_snapshot_from_disk(get_current_head());
+    if (head_snap == NULL) {
+        fprintf(stderr, "Error: Current HEAD snapshot not found for recycling.\n");
+        free_file_list(old_snap->files);
+        free(old_snap);
+        return;
+    }
+    FILE* vault_file = fopen(".mgit/data.bin", "r+b");
+    if (vault_file == NULL) {
+        fprintf(stderr, "Error opening vault for recycling: %s\n", strerror(errno));
+        free_file_list(old_snap->files);
+        free(old_snap);
+        free_file_list(head_snap->files);
+        free(head_snap);
+        return;
+    }
+    FileEntry* old_curr = old_snap->files;
+    while (old_curr != NULL) {
+        if (old_curr->is_directory == 0 && old_curr->num_blocks > 0) {
+            
+            for (uint32_t i = 0; i < old_curr->num_blocks; i++) {
+                
+                if (is_offset_used(head_snap, old_curr->chunks[i].physical_offset) == 0) {
+                    
+                    if (fseek(vault_file, (long)old_curr->chunks[i].physical_offset, SEEK_SET) != 0) {
+                        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+                        break;
+                    }
+                    
+                    uint8_t zero_buffer[4096] = {0};
+                    size_t bytes_to_zero = old_curr->chunks[i].compressed_size; // Note chunks[i]
+                    
+                    while (bytes_to_zero > 0) {
+                        size_t chunk_size = (bytes_to_zero < sizeof(zero_buffer)) ? bytes_to_zero : sizeof(zero_buffer);
+                        if (fwrite(zero_buffer, 1, chunk_size, vault_file) != chunk_size) {
+                            fprintf(stderr, "Error writing zeros to vault: %s\n", strerror(errno));
+                            break;
+                        }
+                        bytes_to_zero -= chunk_size;
+                    }
+                }
+            }
+        }
+        old_curr = old_curr->next;
+    }    
+    fclose(vault_file);
+    free_file_list(old_snap->files);
+    free(old_snap);
+    free_file_list(head_snap->files);
+    free(head_snap);
 }
 
 void mgit_snapshot(const char* msg)
