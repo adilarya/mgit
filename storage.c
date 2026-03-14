@@ -276,7 +276,19 @@ void chunks_recycle(uint32_t target_id)
 void mgit_snapshot(const char* msg)
 {
     // TODO: 1. Get current HEAD ID and calculate next_id. Load previous files for crawling.
+
+    int current_head = (int)get_current_head();
+    int next_id = current_head + 1;
+    Snapshot* prev_snap = load_snapshot_from_disk((uint32_t)current_head);
+    FileEntry* prev_snap_files = (prev_snap != NULL) ? prev_snap->files : NULL;
+
     // TODO: 2. Call build_file_list_bfs() to get the new directory state.
+
+    FileEntry* new_dir_state = build_file_list_bfs(".", prev_snap_files);
+    if (new_dir_state == NULL) {
+        fprintf(stderr, "Error: Failed to build file list.\n");
+        return;
+    }
 
     // TODO: 3. Iterate through the new file list.
     // - If a file has data (chunks) but its size is 0, it needs to be written to the vault.
@@ -284,8 +296,69 @@ void mgit_snapshot(const char* msg)
     //   inode was already written to the vault, copy its offset and size. DO NOT write twice!
     // - Call write_blob_to_vault() for new files.
 
+    FileEntry* current = new_dir_state;
+    while (current != NULL) {
+        if (current->chunks != NULL && current->chunks->compressed_size == 0) {
+            // Check for hard links in the current list
+            FileEntry* check = new_dir_state;
+            int found_hard_link = 0;
+            while (check != current) {
+                if (check->inode == current->inode && check->chunks != NULL && check->chunks->compressed_size > 0) {
+                    // Found a hard link, copy offset and size
+                    current->chunks->physical_offset = check->chunks->physical_offset;
+                    current->chunks->compressed_size = check->chunks->compressed_size;
+                    found_hard_link = 1;
+                    break;
+                }
+                check = check->next;
+            }
+            if (!found_hard_link) {
+                // No hard link found, write to vault
+                write_blob_to_vault(current->path, current->chunks);
+            }
+        }
+        current = current->next;
+    }
+
     // TODO: 4. Call store_snapshot_to_disk() and update_head().
+
+    // getting file_count for the snapshot
+    uint32_t file_count = 0;
+    current = new_dir_state;
+    while (current != NULL) {
+        file_count++;
+        current = current->next;
+    }
+
+    Snapshot new_snapshot;
+    new_snapshot.snapshot_id = (uint32_t)next_id;
+    new_snapshot.file_count = file_count;
+    strncpy(new_snapshot.message, msg, sizeof(new_snapshot.message) - 1);
+    new_snapshot.message[sizeof(new_snapshot.message) - 1] = '\0'; // Ensure null-termination
+    new_snapshot.files = new_dir_state;
+    
+    store_snapshot_to_disk(&new_snapshot);
+    update_head((uint32_t)next_id);
+
     // TODO: 5. Free memory.
+
+    free_file_list(new_dir_state);
+    if (prev_snap != NULL) {
+        free_file_list(prev_snap->files);
+        free(prev_snap);
+    }
+
     // TODO: 6. Enforce MAX_SNAPSHOT_HISTORY (5). If exceeded, call chunks_recycle()
     //          and delete the oldest manifest file using remove().
+
+    if (next_id > MAX_SNAPSHOT_HISTORY) {
+        uint32_t target_id = (uint32_t)(next_id - MAX_SNAPSHOT_HISTORY);
+        chunks_recycle(target_id);
+        char old_snap_path[256];
+        snprintf(old_snap_path, sizeof(old_snap_path), ".mgit/snapshots/snap_%03u.bin", target_id);
+        if (remove(old_snap_path) != 0) {
+            fprintf(stderr, "Error deleting old snapshot '%s': %s\n", old_snap_path, strerror(errno));
+        }
+    }
+
 }
