@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <errno.h>   // For errno 
 
 // Helper to calculate SHA256 using system utility
 void compute_hash(const char* path, uint8_t* output)
