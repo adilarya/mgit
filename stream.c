@@ -79,20 +79,68 @@ void mgit_send(const char* id_str)
 {
     // 1. Handshake Phase
     // TODO: Send the MAGIC_NUMBER (0x4D474954) to STDOUT.
+    uint32_t id;
+    if (id_str == NULL) {
+        FILE* f = fopen(".mgit/HEAD", "r");
+        if (f == NULL) {
+            fprintf(stderr, "Error: Could not open .mgit/HEAD.\n");
+            exit(1);
+        }
+        if (fscanf(f, "%u", &id) != 1) {
+            fprintf(stderr, "Error: Could not read snapshot ID from .mgit/HEAD.\n");
+            exit(1);
+        }
+        fclose(f);
+    } else {
+        id = atoi(id_str);
+    }
+
+    Snapshot* snap = load_snapshot_from_disk(id);
+    if (snap == NULL) {
+        fprintf(stderr, "Error: Snapshot %d not found.\n", id);
+        exit(1);
+    }
     uint32_t magic = htonl(MAGIC_NUMBER);
     write_all(STDOUT_FILENO, &magic, 4);
+
+
     // 2. Manifest Phase
     // TODO: Serialize the snapshot metadata and send its size followed by the buffer.
     size_t manifest_len;
     void* manifest_buf = serialize_snapshot(snap, &manifest_len);
+    uint32_t net_len = htonl((uint32_t)manifest_len);
+    write_all(STDOUT_FILENO, &net_len, 4);
+    write_all(STDOUT_FILENO, manifest_buf, manifest_len);
     // 3. Payload Phase
     // TODO: Iterate through the files in the snapshot.
     // - If DISK MODE: Read the compressed chunks from ".mgit/data.bin" and write_all to STDOUT.
     // - If LIVE MODE: The chunks are already compressed in memory; send them directly.
-    uint32_t net_len = htonl(manifest_len);
-    write_all(STDOUT_FILENO, &net_len, 4);
-    write_all(STDOUT_FILENO, manifest_buf, manifest_len);
-    free();
+    FILE* vault_file = fopen(".mgit/data.bin", "rb");
+    if (vault_file == NULL) {
+        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        free(manifest_buf);
+        free_file_list(snap->files);
+        free(snap);
+        exit(1);
+    }
+    FileEntry* curr = snap->files;
+    while(curr != NULL){
+        if (curr->is_directory == 0 && curr->num_blocks > 0){
+            for (int i = 0; i < curr->num_blocks; i++){
+               fseek(vault_file, curr->chunks[i].physical_offset, SEEK_SET);
+                char* temp_buffer = malloc(curr->chunks[i].compressed_size);
+                fread(temp_buffer, 1, curr->chunks[i].compressed_size, vault_file);
+                write_all(STDOUT_FILENO, temp_buffer, curr->chunks[i].compressed_size);
+                free(temp_buffer);
+            }
+
+        }
+        curr = curr->next;
+    }
+    fclose(vault_file);
+    free(manifest_buf);
+    free_file_list(snap->files); 
+    free(snap);
 }
 
 void mgit_receive(const char* dest_path)
