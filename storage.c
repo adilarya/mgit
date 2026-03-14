@@ -157,10 +157,35 @@ void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
 
 // --- Snapshot Management ---
 void store_snapshot_to_disk(Snapshot* snap)
+
 {
     // TODO: Serialize the Snapshot struct and its linked list of FileEntry/BlockTables
+
     // into a binary file inside `.mgit/snapshots/snap_XXX.bin`.
+    char filename[256];
+    snprintf(filename, sizeof(filename), ".mgit/snapshots/snap_%03u.bin", snap->snapshot_id);   
+    FILE* snap_file = fopen(filename, "wb");
+    if (snap_file == NULL) {
+        fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
+        return;
+    }
+
+    fwrite(snap, sizeof(Snapshot), 1, snap_file);
+    FileEntry* curr = snap->files;
+    while(curr != NULL){
+        fwrite(curr, sizeof(FileEntry), 1, snap_file);
+        if(curr->is_directory == 0 && curr->num_blocks >0){
+            
+            fwrite(curr->chunks, sizeof(BlockTable), curr->num_blocks, snap_file);
+            
+        }
+        curr = curr->next;
+    }
+    fclose(snap_file);
+
+
 }
+
 
 Snapshot* load_snapshot_from_disk(uint32_t id)
 {
