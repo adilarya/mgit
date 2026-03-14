@@ -166,14 +166,12 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
     FileEntry* root_entry = malloc(sizeof(FileEntry));
 
     if (!root_entry) {
-        fprintf(stderr, "Error: Failed to allocate memory for root entry.\n");
         return NULL;
     }
     strncpy(root_entry->path, root, sizeof(root_entry->path) - 1);
     root_entry->path[sizeof(root_entry->path) - 1] = '\0';
     struct stat file_stat;
     if (stat(root, &file_stat) == -1) {
-        fprintf(stderr, "Error: Could not stat root directory: %s\n", strerror(errno));
         free(root_entry);
         return NULL;
     }
@@ -204,7 +202,6 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
         if (curr->is_directory == 1){
             DIR* dir = opendir(curr->path);
             if (dir == NULL) {
-                fprintf(stderr, "Error: Could not open directory %s: %s\n", curr->path, strerror(errno));
             } else {
                 struct dirent* entry;
                 while ((entry = readdir(dir)) != NULL) {
@@ -219,7 +216,6 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
                     FileEntry* child_entry = malloc(sizeof(FileEntry));
 
                     if (child_entry == NULL) {
-                        fprintf(stderr, "Error: Failed to allocate memory for child entry.\n");
                         continue;
                     }
                     strncpy(child_entry->path, child_path, sizeof(child_entry->path) - 1);
@@ -227,7 +223,6 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
 
                     struct stat child_stat;
                     if (stat(child_path, &child_stat) == -1) {
-                        fprintf(stderr, "Error: Could not stat file %s: %s\n", child_path, strerror(errno));
                         free(child_entry);
                         continue;
                     }
@@ -249,7 +244,6 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
                         child_entry->num_blocks = 1;
                         child_entry->chunks = malloc(sizeof(BlockTable));
                         if (child_entry->chunks == NULL) {
-                            fprintf(stderr, "Error: Failed to allocate memory for BlockTable.\n");
                             free(child_entry);
                             continue;
                         }
