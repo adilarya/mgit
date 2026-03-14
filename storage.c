@@ -98,7 +98,7 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
         return;
     }
     
-    block->size = (uint32_t)bytes_read_total;
+    block->compressed_size = (uint32_t)bytes_read_total;
     block->physical_offset = (uint64_t)offset;
 
     fclose(in_file);

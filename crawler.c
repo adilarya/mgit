@@ -212,7 +212,10 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
                         continue;
                     }
                     char child_path[4096];
-                    snprintf(child_path, sizeof(child_path), "%s/%s", curr->path, entry->d_name);
+                    strncpy(child_path, curr->path, sizeof(child_path) - 1);
+                    child_path[sizeof(child_path) - 1] = '\0';
+                    strncat(child_path, "/", sizeof(child_path) - strlen(child_path) - 1);
+                    strncat(child_path, entry->d_name, sizeof(child_path) - strlen(child_path) - 1);
                     FileEntry* child_entry = malloc(sizeof(FileEntry));
 
                     if (child_entry == NULL) {

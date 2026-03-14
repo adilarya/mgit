@@ -1,5 +1,6 @@
 #include "mgit.h"
 #include <arpa/inet.h> // For htonl/ntohl
+#include <errno.h>
 #include <zstd.h>
 
 // --- Safe I/O Helpers ---
