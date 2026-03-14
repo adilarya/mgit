@@ -162,12 +162,133 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
     FileEntry *head = NULL, *tail = NULL;
 
     // TODO: 1. Initialize the Root directory "." and add it to your BFS queue/list.
+    FileEntry* root_entry = malloc(sizeof(FileEntry));
+
+    if (!root_entry) {
+        fprintf(stderr, "Error: Failed to allocate memory for root entry.\n");
+        return NULL;
+    }
+    strncpy(root_entry->path, root, sizeof(root_entry->path) - 1);
+    root_entry->path[sizeof(root_entry->path) - 1] = '\0';
+    struct stat file_stat;
+    if (stat(root, &file_stat) == -1) {
+        fprintf(stderr, "Error: Could not stat root directory: %s\n", strerror(errno));
+        free(root_entry);
+        return NULL;
+    }
+    root_entry->size = file_stat.st_size;
+    root_entry->mtime = file_stat.st_mtime;
+    root_entry->inode = file_stat.st_ino;
+    if (S_ISDIR(file_stat.st_mode)) {
+        root_entry->is_directory = 1;
+    } else {
+        root_entry->is_directory = 0;
+    }
+    memset(root_entry->checksum, 0, 32);
+    root_entry->num_blocks = 0;
+    root_entry->chunks = NULL;
+    root_entry->next = NULL;
+
+    head = root_entry;
+    tail = root_entry;
+    FileEntry* curr = head;
 
     // TODO: 2. Implement Level-Order Traversal (BFS)
     // - Open directories using opendir() and readdir().
     // - Ignore "." and ".." and the ".mgit" folder.
     // - Construct the full file path safely to avoid buffer overflows.
     // - Use stat() to gather size, mtime, inode, and directory status.
+
+    while(curr != NULL){
+        if (curr->is_directory == 1){
+            DIR* dir = opendir(curr->path);
+            if (dir == NULL) {
+                fprintf(stderr, "Error: Could not open directory %s: %s\n", curr->path, strerror(errno));
+            } else {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != NULL) {
+                   if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, ".mgit") == 0) {
+                        continue;
+                    }
+                    char child_path[4096];
+                    snprintf(child_path, sizeof(child_path), "%s/%s", curr->path, entry->d_name);
+                    FileEntry* child_entry = malloc(sizeof(FileEntry));
+
+                    if (child_entry == NULL) {
+                        fprintf(stderr, "Error: Failed to allocate memory for child entry.\n");
+                        continue;
+                    }
+                    strncpy(child_entry->path, child_path, sizeof(child_entry->path) - 1);
+                    child_entry->path[sizeof(child_entry->path) - 1] = '\0';
+
+                    struct stat child_stat;
+                    if (stat(child_path, &child_stat) == -1) {
+                        fprintf(stderr, "Error: Could not stat file %s: %s\n", child_path, strerror(errno));
+                        free(child_entry);
+                        continue;
+                    }
+                    child_entry->size = child_stat.st_size;
+                    child_entry->mtime = child_stat.st_mtime;
+                    child_entry->inode = child_stat.st_ino;
+                    if (S_ISDIR(child_stat.st_mode)) {
+                        child_entry->is_directory = 1;
+                        child_entry->num_blocks = 0;
+                        child_entry->chunks = NULL;
+                        memset(child_entry->checksum, 0, 32);
+                    } else {
+                        child_entry->is_directory = 0;
+                        //part 3 deduplication
+                        child_entry->num_blocks = 1;
+                        child_entry->chunks = malloc(sizeof(BlockTable));
+                        if (child_entry->chunks == NULL) {
+                            fprintf(stderr, "Error: Failed to allocate memory for BlockTable.\n");
+                            free(child_entry);
+                            continue;
+                        }
+                        child_entry->chunks[0].physical_offset = 0;
+                        child_entry->chunks[0].compressed_size = 0;
+                        memset(child_entry->checksum, 0, 32);
+                        // Check for hard link deduplication
+                        FileEntry* existing = find_in_current_by_inode(head, child_entry->inode);
+                        if (existing) {
+                            child_entry->chunks[0].physical_offset = existing->chunks[0].physical_offset;
+                            child_entry->chunks[0].compressed_size = existing->chunks[0].compressed_size;
+                            memcpy(child_entry->checksum, existing->checksum, 32);
+                        } else {
+                            // Check for quick check deduplication against previous snapshot
+
+                            FileEntry* prev_match = find_in_prev(prev_snap_files, child_entry->path);
+                            if (prev_match && !prev_match->is_directory && 
+                                        prev_match->size == child_entry->size && 
+                                        prev_match->mtime == child_entry->mtime) {
+                                        
+                                        child_entry->chunks[0].physical_offset = prev_match->chunks[0].physical_offset;
+                                        child_entry->chunks[0].compressed_size = prev_match->chunks[0].compressed_size;
+                                        memcpy(child_entry->checksum, prev_match->checksum, 32);
+                                    } else {
+                                        // deep check
+                                        // If we reach here, the file is new or modified.
+                                        compute_hash(child_entry->path, child_entry->checksum);
+                                    }                        
+                        }
+
+                    }
+                    child_entry->next = NULL;
+                    tail->next = child_entry;
+                    tail = child_entry;
+                    
+                
+
+                }
+                closedir(dir);
+                
+
+            }
+            
+        } 
+        curr = curr->next;
+
+    }
 
     // TODO: 3. Deduplication (Quick Check)
     // - First, check if the inode was already seen in the CURRENT snapshot (Hard Link).
@@ -182,6 +303,7 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
 
     return head;
 }
+
 
 void free_file_list(FileEntry* head)
 {
