@@ -6,12 +6,33 @@
 uint32_t get_current_head()
 {
     // TODO: Read the integer from ".mgit/HEAD" and return it. Return 0 if it fails.
-    return 0;
+    FILE* head_file = fopen(".mgit/HEAD", "r");
+    if (head_file == NULL) {
+        return 0;
+    }
+    uint32_t head_id;
+    if (fscanf(head_file, "%u", &head_id) != 1) {
+        fprintf(stderr, "Error: Could not read from .mgit/HEAD: %s\n", strerror(errno));
+        fclose(head_file);
+        return 0;
+    }
+    fclose(head_file);
+    return head_id;
 }
 
 void update_head(uint32_t new_id)
 {
     // TODO: Overwrite ".mgit/HEAD" with the new_id.
+    FILE* head_file = fopen(".mgit/HEAD", "w");
+    if (head_file == NULL) {
+        fprintf(stderr, "Error: Could not open .mgit/HEAD for writing: %s\n", strerror(errno));
+        return;
+    }
+    if (fprintf(head_file, "%u", new_id) < 0) {
+        fprintf(stderr, "Error: Could not write to .mgit/HEAD: %s\n", strerror(errno));
+    }
+    fclose(head_file);
+
 }
 
 // --- Blob Storage (Raw) ---
