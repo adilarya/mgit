@@ -13,7 +13,17 @@ FileEntry* reverse_list(FileEntry* head)
     // TODO: Standard linked list reversal.
     // Why do we need this? Because BFS gives us Root -> Children.
     // To safely delete directories, we need to process Children -> Root.
-    return NULL;
+    FileEntry* prev = NULL;
+    FileEntry* curr = head;
+    FileEntry* next = NULL;
+    while (curr != NULL) {
+        next = curr->next;
+        curr->next = prev;
+        prev = curr;
+        curr = next;
+    }
+    //prev is the new head because list gto revsersed 
+    return prev;
 }
 
 void mgit_restore(const char* id_str)
