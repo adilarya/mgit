@@ -84,11 +84,11 @@ void mgit_send(const char* id_str)
     if (id_str == NULL) {
         FILE* f = fopen(".mgit/HEAD", "r");
         if (f == NULL) {
-            fprintf(stderr, "Error: Could not open .mgit/HEAD.\n");
+            // fprintf(stderr, "Error: Could not open .mgit/HEAD.\n");
             exit(1);
         }
         if (fscanf(f, "%u", &id) != 1) {
-            fprintf(stderr, "Error: Could not read snapshot ID from .mgit/HEAD.\n");
+            // fprintf(stderr, "Error: Could not read snapshot ID from .mgit/HEAD.\n");
             exit(1);
         }
         fclose(f);
@@ -98,7 +98,7 @@ void mgit_send(const char* id_str)
 
     Snapshot* snap = load_snapshot_from_disk(id);
     if (snap == NULL) {
-        fprintf(stderr, "Error: Snapshot %d not found.\n", id);
+        // fprintf(stderr, "Error: Snapshot %d not found.\n", id);
         exit(1);
     }
     uint32_t magic = htonl(MAGIC_NUMBER);
@@ -118,7 +118,7 @@ void mgit_send(const char* id_str)
     // - If LIVE MODE: The chunks are already compressed in memory; send them directly.
     FILE* vault_file = fopen(".mgit/data.bin", "rb");
     if (vault_file == NULL) {
-        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        // fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
         free(manifest_buf);
         free_file_list(snap->files);
         free(snap);
@@ -151,19 +151,19 @@ void mgit_receive(const char* dest_path)
 
     char old_cwd[1024];
     if (getcwd(old_cwd, sizeof(old_cwd)) == NULL) {
-        fprintf(stderr, "Error getting current working directory: %s\n", strerror(errno));
+        // fprintf(stderr, "Error getting current working directory: %s\n", strerror(errno));
         return;
     }
 
     if (mkdir(dest_path, 0755) == -1) {
         if (errno != EEXIST) {
-            fprintf(stderr, "Error creating directory '%s': %s\n", dest_path, strerror(errno));
+            // fprintf(stderr, "Error creating directory '%s': %s\n", dest_path, strerror(errno));
             return;
         }
     }
 
     if (chdir(dest_path) == -1) {
-        fprintf(stderr, "Error changing directory to '%s': %s\n", dest_path, strerror(errno));
+        // fprintf(stderr, "Error changing directory to '%s': %s\n", dest_path, strerror(errno));
         return;
     }
 
@@ -173,7 +173,7 @@ void mgit_receive(const char* dest_path)
     if (read_all(STDIN_FILENO, &magic, 4) != 4)
         exit(1);
     if (ntohl(magic) != MAGIC_NUMBER) {
-        fprintf(stderr, "Error: Invalid protocol\n");
+        // fprintf(stderr, "Error: Invalid protocol\n");
         exit(1);
     }
 
@@ -191,12 +191,12 @@ void mgit_receive(const char* dest_path)
 
     void *buf = malloc(manifest_len);
     if (!buf) {
-        fprintf(stderr, "Error allocating memory for manifest buffer.\n");
+        // fprintf(stderr, "Error allocating memory for manifest buffer.\n");
         exit(1);
     }
 
     if (read_all(STDIN_FILENO, buf, manifest_len) != manifest_len) {
-        fprintf(stderr, "Error reading manifest data from STDIN.\n");
+        // fprintf(stderr, "Error reading manifest data from STDIN.\n");
         free(buf);
         exit(1);
     }
@@ -205,7 +205,7 @@ void mgit_receive(const char* dest_path)
 
     Snapshot *snap = malloc(sizeof(Snapshot));
     if (!snap) {
-        fprintf(stderr, "Error allocating memory for snapshot.\n");
+        // fprintf(stderr, "Error allocating memory for snapshot.\n");
         free(buf);
         exit(1);
     }
@@ -318,7 +318,7 @@ void mgit_receive(const char* dest_path)
 
                 ssize_t got = read_all(STDIN_FILENO, buffer, want);
                 if (got != (ssize_t)want) {
-                    fprintf(stderr, "Error: Incomplete payload stream\n");
+                    // fprintf(stderr, "Error: Incomplete payload stream\n");
                     fclose(vault);
                     free_file_list(snap->files);
                     free(snap);
@@ -360,7 +360,7 @@ void mgit_receive(const char* dest_path)
     free(snap);
 
     if (chdir(old_cwd) == -1) {
-        fprintf(stderr, "Error changing back to original directory '%s': %s\n", old_cwd, strerror(errno));
+        // fprintf(stderr, "Error changing back to original directory '%s': %s\n", old_cwd, strerror(errno));
         return;
     }
 }
