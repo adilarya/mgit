@@ -29,6 +29,10 @@ FileEntry* find_in_prev(FileEntry* prev, const char* path)
 {
     // TODO: Iterate through the 'prev' linked list.
     // Return the FileEntry if its path matches the requested path, otherwise return NULL.
+    if (prev == NULL || path == NULL) {
+        return NULL;
+    }
+
     FileEntry* curr = prev;
     while(curr != NULL){
         if (strcmp(curr->path, path) == 0){

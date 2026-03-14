@@ -3,6 +3,9 @@
 // Helper: Check if a path exists in the target snapshot
 int path_in_snapshot(Snapshot* snap, const char* path)
 {
+    if (snap == NULL || path == NULL) {
+        return 0;
+    }
     // TODO: Iterate over snap->files and return 1 if the path matches, 0 otherwise.
     FileEntry* curr = snap->files;
     while(curr != NULL){
