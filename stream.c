@@ -148,6 +148,26 @@ void mgit_receive(const char* dest_path)
     // 1. Setup
     // TODO: mkdir(dest_path) and mgit_init() inside it.
 
+    char old_cwd[1024];
+    if (getcwd(old_cwd, sizeof(old_cwd)) == NULL) {
+        fprintf(stderr, "Error getting current working directory: %s\n", strerror(errno));
+        return;
+    }
+
+    if (mkdir(dest_path, 0755) == -1) {
+        if (errno != EEXIST) {
+            fprintf(stderr, "Error creating directory '%s': %s\n", dest_path, strerror(errno));
+            return;
+        }
+    }
+
+    if (chdir(dest_path) == -1) {
+        fprintf(stderr, "Error changing directory to '%s': %s\n", dest_path, strerror(errno));
+        return;
+    }
+
+    mgit_init();
+
     uint32_t magic;
     if (read_all(STDIN_FILENO, &magic, 4) != 4)
         exit(1);
@@ -168,6 +188,88 @@ void mgit_receive(const char* dest_path)
     // TODO: Read the manifest size, allocate memory, and read the serialized data.
     // Reconstruct the linked list of FileEntries.
 
+    void *buf = malloc(manifest_len);
+    if (!buf) {
+        fprintf(stderr, "Error allocating memory for manifest buffer.\n");
+        exit(1);
+    }
+
+    if (read_all(STDIN_FILENO, buf, manifest_len) != manifest_len) {
+        fprintf(stderr, "Error reading manifest data from STDIN.\n");
+        free(buf);
+        exit(1);
+    }
+
+    char *ptr = (char *)buf;
+
+    Snapshot *snap = malloc(sizeof(Snapshot));
+    if (!snap) {
+        fprintf(stderr, "Error allocating memory for snapshot.\n");
+        free(buf);
+        exit(1);
+    }
+
+    memcpy(&snap->snapshot_id, ptr, sizeof(uint32_t));
+    ptr += sizeof(uint32_t);
+
+    memcpy(&snap->file_count, ptr, sizeof(uint32_t));
+    ptr += sizeof(uint32_t);
+
+    memcpy(snap->message, ptr, sizeof(snap->message));
+    ptr += sizeof(snap->message);
+
+    snap->files = NULL;
+
+    FileEntry *head = NULL;
+    FileEntry *tail = NULL;
+
+    for (uint32_t i = 0; i < snap->file_count; i++) {
+        FileEntry *node = malloc(sizeof(FileEntry));
+        if (!node) {
+            perror("malloc");
+            free(buf);
+            free_file_list(head);
+            free(snap);
+            exit(1);
+        }
+
+        memset(node, 0, sizeof(FileEntry));
+
+        size_t fixed_size = sizeof(FileEntry) - sizeof(void*) * 2;
+        memcpy(node, ptr, fixed_size);
+        ptr += fixed_size;
+
+        node->chunks = NULL;
+        node->next = NULL;
+
+        if (node->num_blocks > 0) {
+            size_t blocks_size = sizeof(BlockTable) * node->num_blocks;
+            node->chunks = malloc(blocks_size);
+            if (!node->chunks) {
+                perror("malloc");
+                free(buf);
+                free(node);
+                free_file_list(head);
+                free(snap);
+                exit(1);
+            }
+
+            memcpy(node->chunks, ptr, blocks_size);
+            ptr += blocks_size;
+        }
+
+        if (!head) {
+            head = node;
+            tail = node;
+        } else {
+            tail->next = node;
+            tail = node;
+        }
+    }
+
+    snap->files = head;
+    free(buf);
+
     // 4. Processing Chunks (The Streaming OS Challenge)
     // TODO: Open ".mgit/data.bin" for appending.
     // For each file in the manifest:
@@ -176,6 +278,88 @@ void mgit_receive(const char* dest_path)
     //      - Write the raw compressed bytes into the local ".mgit/data.bin".
     //      - HINT: Don't forget to update physical_offset for the local vault!
 
+    FILE *vault = fopen(".mgit/data.bin", "ab");
+    if (!vault) {
+        perror("fopen");
+        free_file_list(snap->files);
+        free(snap);
+        exit(1);
+    }
+
+    FileEntry *curr = snap->files;
+    char buffer[8192];
+
+    while (curr) {
+        if (!curr->is_directory && curr->num_blocks > 0 && curr->chunks != NULL) {
+            uint32_t bytes_remaining = curr->chunks[0].compressed_size;
+
+            if (fseek(vault, 0, SEEK_END) != 0) {
+                perror("fseek");
+                fclose(vault);
+                free_file_list(snap->files);
+                free(snap);
+                exit(1);
+            }
+
+            long local_offset = ftell(vault);
+            if (local_offset < 0) {
+                perror("ftell");
+                fclose(vault);
+                free_file_list(snap->files);
+                free(snap);
+                exit(1);
+            }
+
+            curr->chunks[0].physical_offset = (uint64_t)local_offset;
+
+            while (bytes_remaining > 0) {
+                size_t want = (bytes_remaining < sizeof(buffer)) ? bytes_remaining : sizeof(buffer);
+
+                ssize_t got = read_all(STDIN_FILENO, buffer, want);
+                if (got != (ssize_t)want) {
+                    fprintf(stderr, "Error: Incomplete payload stream\n");
+                    fclose(vault);
+                    free_file_list(snap->files);
+                    free(snap);
+                    exit(1);
+                }
+
+                if (fwrite(buffer, 1, want, vault) != want) {
+                    perror("fwrite");
+                    fclose(vault);
+                    free_file_list(snap->files);
+                    free(snap);
+                    exit(1);
+                }
+
+                bytes_remaining -= (uint32_t)want;
+            }
+        }
+
+        curr = curr->next;
+    }
+
+    fclose(vault);
+
     // 5. Cleanup
     // TODO: Save the new snapshot to disk and update HEAD.
+
+    uint32_t local_head = get_current_head();
+    uint32_t new_local_id = local_head + 1;
+
+    /* Receiver assigns the incoming snapshot the next local ID */
+    snap->snapshot_id = new_local_id;
+
+    /* Save snapshot manifest locally, then update HEAD */
+    store_snapshot_to_disk(snap);
+    update_head(new_local_id);
+
+    /* Free reconstructed snapshot */
+    free_file_list(snap->files);
+    free(snap);
+
+    if (chdir(old_cwd) == -1) {
+        fprintf(stderr, "Error changing back to original directory '%s': %s\n", old_cwd, strerror(errno));
+        return;
+    }
 }
