@@ -42,6 +42,67 @@ void write_blob_to_vault(const char* filepath, BlockTable* block)
     // TODO: Open `.mgit/data.bin` for APPENDING (ab).
     // TODO: Use ftell() to record the current end of the vault into block->physical_offset.
     // TODO: Read the file bytes and write them into the vault. Update block->size.
+
+    if (block == NULL) {
+        fprintf(stderr, "Error: BlockTable pointer is NULL.\n");
+        return;
+    }
+
+    FILE* in_file = fopen(filepath, "rb");
+    if (in_file == NULL) {
+        fprintf(stderr, "Error opening file '%s': %s\n", filepath, strerror(errno));
+        return;
+    }
+
+    FILE* vault_file = fopen(".mgit/data.bin", "ab");
+    if (vault_file == NULL) {
+        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        fclose(in_file);
+        return;
+    }
+
+    // Move to the end of the vault to get the current offset
+    if (fseek(vault_file, 0, SEEK_END) != 0) {
+        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+        fclose(in_file);
+        fclose(vault_file);
+        return;
+    }
+
+    long offset = ftell(vault_file);
+    if (offset == -1) {
+        fprintf(stderr, "Error getting vault offset: %s\n", strerror(errno));
+        fclose(in_file);
+        fclose(vault_file);
+        return;
+    }
+
+    // Read the file bytes and write them into the vault. Update block->size.
+    uint8_t buffer[4096];
+    size_t bytes_read;
+    size_t bytes_read_total = 0;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), in_file)) > 0) {
+        if (fwrite(buffer, 1, bytes_read, vault_file) != bytes_read) {
+            fprintf(stderr, "Error writing to vault: %s\n", strerror(errno));
+            fclose(in_file);
+            fclose(vault_file);
+            return;
+        }
+        bytes_read_total += bytes_read;
+    }
+
+    if (ferror(in_file)) {
+        fprintf(stderr, "Error reading file '%s': %s\n", filepath, strerror(errno));
+        fclose(in_file);
+        fclose(vault_file);
+        return;
+    }
+    
+    block->size = (uint32_t)bytes_read_total;
+    block->physical_offset = (uint64_t)offset;
+
+    fclose(in_file);
+    fclose(vault_file);
 }
 
 void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
