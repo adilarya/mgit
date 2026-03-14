@@ -46,4 +46,41 @@ void mgit_init()
     // HINT: Open with O_CREAT | O_WRONLY and 0644 permissions. Do NOT use O_TRUNC!
 
     // TODO: Create ".mgit/HEAD" and write "0" into it to initialize the snapshot counter.
+
+    struct stat st;
+    if (stat(".mgit", &st) == 0) {
+        return;
+    } else if (errno != ENOENT) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    } else if (mkdir(".mgit", 0755) == -1) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    if (mkdir(".mgit/snapshots", 0755) == -1) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    int fd = open(".mgit/data.bin", O_CREAT | O_WRONLY, 0644);
+    if (fd == -1) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+
+    fd = open(".mgit/HEAD", O_CREAT | O_WRONLY, 0644);
+    if (fd == -1) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    if (write(fd, "0", 1) == -1) {
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    close(fd);
 }
