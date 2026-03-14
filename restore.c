@@ -4,6 +4,13 @@
 int path_in_snapshot(Snapshot* snap, const char* path)
 {
     // TODO: Iterate over snap->files and return 1 if the path matches, 0 otherwise.
+    FileEntry* curr = snap->files;
+    while(curr != NULL){
+        if(strcmp(curr->path, path) == 0){
+            return 1;
+        }
+        curr = curr->next;
+    }
     return 0;
 }
 
