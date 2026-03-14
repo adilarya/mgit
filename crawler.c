@@ -238,7 +238,11 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
                         memset(child_entry->checksum, 0, 32);
                     } else {
                         child_entry->is_directory = 0;
-                        //part 3 deduplication
+                            // TODO: 3. Deduplication (Quick Check)
+                            // - First, check if the inode was already seen in the CURRENT snapshot (Hard Link).
+                            // - Next, check if the file matches the PREVIOUS snapshot (mtime & size match).
+                            // - If it matches, copy the checksum and block metadata. DO NOT re-hash.
+
                         child_entry->num_blocks = 1;
                         child_entry->chunks = malloc(sizeof(BlockTable));
                         if (child_entry->chunks == NULL) {
@@ -267,13 +271,16 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
                                         child_entry->chunks[0].compressed_size = prev_match->chunks[0].compressed_size;
                                         memcpy(child_entry->checksum, prev_match->checksum, 32);
                                     } else {
-                                        // deep check
-                                        // If we reach here, the file is new or modified.
+                                    // TODO: 4. Deep Check
+                                    // - If the file is modified or new, use compute_hash() to generate the SHA-256.
+                                    // - Allocate the BlockTable (chunks). Note: physical_offset is set later in storage.c.
                                         compute_hash(child_entry->path, child_entry->checksum);
                                     }                        
                         }
 
                     }
+                    // TODO: 5. Append new FileEntry to your linked list.
+
                     child_entry->next = NULL;
                     tail->next = child_entry;
                     tail = child_entry;
@@ -291,16 +298,8 @@ FileEntry* build_file_list_bfs(const char* root, FileEntry* prev_snap_files)
 
     }
 
-    // TODO: 3. Deduplication (Quick Check)
-    // - First, check if the inode was already seen in the CURRENT snapshot (Hard Link).
-    // - Next, check if the file matches the PREVIOUS snapshot (mtime & size match).
-    // - If it matches, copy the checksum and block metadata. DO NOT re-hash.
 
-    // TODO: 4. Deep Check
-    // - If the file is modified or new, use compute_hash() to generate the SHA-256.
-    // - Allocate the BlockTable (chunks). Note: physical_offset is set later in storage.c.
 
-    // TODO: 5. Append new FileEntry to your linked list.
 
     return head;
 }
