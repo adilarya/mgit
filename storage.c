@@ -181,6 +181,7 @@ void store_snapshot_to_disk(Snapshot* snap)
         }
         curr = curr->next;
     }
+    
     fclose(snap_file);
 
 
@@ -191,7 +192,76 @@ Snapshot* load_snapshot_from_disk(uint32_t id)
 {
     // TODO: Read a `snap_XXX.bin` file and reconstruct the Snapshot struct
     // and its FileEntry linked list in heap memory.
-    return NULL;
+
+    char filename[256];
+    snprintf(filename, sizeof(filename), ".mgit/snapshots/snap_%03u.bin", id);
+    FILE* snap_file = fopen(filename, "rb");
+    if (snap_file == NULL) {
+        fprintf(stderr, "Error opening snapshot file '%s': %s\n", filename, strerror(errno));
+        return NULL;
+    }
+
+    Snapshot* snap = malloc(sizeof(Snapshot));
+    if (snap == NULL) {
+        fprintf(stderr, "Error allocating memory for snapshot.\n");
+        fclose(snap_file);
+        
+        return NULL;
+    }
+
+    if (fread(snap, sizeof(Snapshot), 1, snap_file) != 1) {
+        fprintf(stderr, "Error reading snapshot header from file '%s'.\n", filename);
+        free(snap);
+        fclose(snap_file);
+        return NULL;
+    }
+    FileEntry* head = NULL;
+    FileEntry* tail = NULL;
+    snap->files = NULL;
+    for (uint32_t i = 0; i < snap->file_count; i++) {
+        FileEntry* entry = malloc(sizeof(FileEntry));
+        if (entry == NULL) {
+            fprintf(stderr, "Error allocating memory for FileEntry.\n");
+            free(snap);
+            fclose(snap_file);
+            free_file_list(head);
+            return NULL;
+        }
+        if (fread(entry, sizeof(FileEntry), 1, snap_file) != 1) {
+            fprintf(stderr, "Error reading FileEntry from file '%s'.\n", filename);
+            free(entry);
+            free(snap);
+            fclose(snap_file);
+            free_file_list(head);
+            return NULL;
+        }
+        entry->next = NULL;
+        if (entry->is_directory == 0 && entry->num_blocks > 0) {
+        entry->chunks = malloc(sizeof(BlockTable) * entry->num_blocks);
+        if (fread(entry->chunks, sizeof(BlockTable), entry->num_blocks, snap_file) != entry->num_blocks) {
+            fprintf(stderr, "Error reading BlockTable from file '%s'.\n", filename);
+            free(entry->chunks);
+            free(entry);
+            free(snap);
+            fclose(snap_file);
+            free_file_list(head);
+            return NULL;
+        }
+        } else {
+            entry->chunks = NULL;
+        }
+        if (head == NULL) {
+        head = entry;
+        tail = entry;
+        } else {
+            tail->next = entry;
+            tail = entry;
+        }
+        
+    }
+    snap->files = head;
+    fclose(snap_file);
+    return snap;
 }
 
 void chunks_recycle(uint32_t target_id)
