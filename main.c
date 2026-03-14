@@ -78,3 +78,61 @@ void mgit_init()
 
     close(fd);
 }
+
+void mgit_show(const char* id_str)
+{
+    // --- LIVE VIEW ---
+    if (id_str == NULL) {
+        printf("=== LIVE VIEW ===\n");
+
+        FileEntry* list = build_file_list_bfs(".", NULL);
+        FileEntry* curr = list;
+
+        while (curr) {
+            printf("%s", curr->path);
+
+            if (curr->is_directory)
+                printf(" [DIR]");
+            else
+                printf(" (%ld bytes)", curr->size);
+
+            printf("\n");
+
+            curr = curr->next;
+        }
+
+        free_file_list(list);
+        return;
+    }
+
+    // --- SNAPSHOT VIEW ---
+    uint32_t id = atoi(id_str);
+
+    Snapshot* snap = load_snapshot_from_disk(id);
+    if (!snap) {
+        fprintf(stderr, "Error: Snapshot %d not found.\n", id);
+        exit(1);
+    }
+
+    printf("=== SNAPSHOT %u ===\n", snap->snapshot_id);
+    printf("Message: %s\n", snap->message);
+    printf("Files:\n");
+
+    FileEntry* curr = snap->files;
+
+    while (curr) {
+        printf("%s", curr->path);
+
+        if (curr->is_directory)
+            printf(" [DIR]");
+        else
+            printf(" (%ld bytes)", curr->size);
+
+        printf("\n");
+
+        curr = curr->next;
+    }
+
+    free_file_list(snap->files);
+    free(snap);
+}
