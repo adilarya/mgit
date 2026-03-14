@@ -109,6 +109,50 @@ void read_blob_from_vault(uint64_t offset, uint32_t size, int out_fd)
 {
     // TODO: Open the vault, fseek() to the physical_offset.
     // TODO: Read `size` bytes and write them to `out_fd` using the write_all() helper.
+
+    if (size == 0) {
+        return; // Nothing to read
+    }
+
+    FILE* vault_file = fopen(".mgit/data.bin", "rb");
+    if (vault_file == NULL) {
+        fprintf(stderr, "Error opening vault: %s\n", strerror(errno));
+        return;
+    }
+
+    if (fseek(vault_file, (long)offset, SEEK_SET) != 0) {
+        fprintf(stderr, "Error seeking in vault: %s\n", strerror(errno));
+        fclose(vault_file);
+        return;
+    }
+
+    uint8_t buffer[4096];
+    uint32_t bytes_remaining = size;
+    while (bytes_remaining > 0) {
+        size_t chunk_size = (bytes_remaining < sizeof(buffer)) ? bytes_remaining : sizeof(buffer);
+        size_t bytes_read = fread(buffer, 1, chunk_size, vault_file);
+        if (bytes_read == 0) {
+            if (feof(vault_file)) {
+                fprintf(stderr, "Unexpected end of vault file.\n");
+            } else {
+                fprintf(stderr, "Error reading from vault: %s\n", strerror(errno));
+            }
+            fclose(vault_file);
+            return;
+        }
+        if (write_all(out_fd, buffer, bytes_read) < 0) {
+            fprintf(stderr, "Error writing to output fd: %s\n", strerror(errno));
+            fclose(vault_file);
+            return;
+        }
+        bytes_remaining -= (uint32_t)bytes_read;
+    }
+
+    if (bytes_remaining != 0) {
+        fprintf(stderr, "Error: Expected to read %u bytes but %u bytes remain.\n", size, bytes_remaining);
+    }
+
+    fclose(vault_file);
 }
 
 // --- Snapshot Management ---
