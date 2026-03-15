@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <zstd.h>
 
+//Project made by Adil Arya and Eshwar Rajasekar
+
 // --- Safe I/O Helpers ---
 // These are essential for handling partial reads/writes in Pipes/Sockets.
 ssize_t read_all(int fd, void* buf, size_t count)

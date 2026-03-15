@@ -1,6 +1,8 @@
 #include "mgit.h"
 #include <errno.h>
 
+//Project made by Adil Arya and Eshwar Rajasekar
+
 // Helper: Check if a path exists in the target snapshot
 int path_in_snapshot(Snapshot* snap, const char* path)
 {
