@@ -3,8 +3,6 @@
 #include <errno.h>
 #include <zstd.h>
 
-//Project made by Adil Arya and Eshwar Rajasekar
-
 // --- Safe I/O Helpers ---
 ssize_t read_all(int fd, void* buf, size_t count)
 {
