@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>   // For errno 
 
+//Project made by Adil Arya and Eshwar Rajasekar
+
 // Helper to calculate SHA256 using system utility
 void compute_hash(const char* path, uint8_t* output)
 {

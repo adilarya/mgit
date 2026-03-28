@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <zstd.h>
 
+//Project made by Adil Arya and Eshwar Rajasekar
+
 // --- Helper Functions ---
 uint32_t get_current_head()
 {
